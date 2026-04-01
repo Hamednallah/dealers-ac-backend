@@ -26,7 +26,7 @@
         <springdoc.version>2.3.0</springdoc.version>
         <bucket4j.version>8.10.1</bucket4j.version>
         <itext.version>7.2.5</itext.version>
-        <testcontainers.version>1.20.1</testcontainers.version>
+        <testcontainers.version>1.20.4</testcontainers.version>
     </properties>
 
     <dependencies>
@@ -169,6 +169,12 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>
             <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-transport-okhttp</artifactId>
+            <version>3.3.6</version>
             <scope>test</scope>
         </dependency>
 

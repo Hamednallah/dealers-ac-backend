@@ -22,6 +22,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - dealersac-net
 
   # ─────────────────────────────────────────────
   # Application
@@ -53,6 +55,12 @@ services:
       timeout: 5s
       start_period: 45s
       retries: 3
+    networks:
+      - dealersac-net
 
 volumes:
   postgres_data:
+
+networks:
+  dealersac-net:
+    driver: bridge
