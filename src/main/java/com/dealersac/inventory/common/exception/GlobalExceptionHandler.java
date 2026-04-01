@@ -84,6 +84,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return pd;
     }
 
+    @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLockingFailure(org.springframework.orm.ObjectOptimisticLockingFailureException ex) {
+        log.warn("Optimistic locking failure: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "The vehicle was just updated or reserved by someone else. Please refresh and try again.");
+        pd.setType(URI.create("/errors/conflict"));
+        return pd;
+    }
+
     // ── 422 Validation ────────────────────────────────────────────────────────
 
     @Override

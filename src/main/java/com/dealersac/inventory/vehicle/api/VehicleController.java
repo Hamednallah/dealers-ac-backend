@@ -77,6 +77,13 @@ public class VehicleController {
         return vehicleService.update(id, request, TenantContext.getTenantId());
     }
 
+    @PostMapping("/{id}/checkout")
+    @Operation(summary = "Reserve a vehicle for checkout",
+               description = "Temporarily locks the vehicle in a RESERVED_PENDING_PAYMENT state for 15 minutes to prevent concurrent purchases.")
+    public VehicleResponse reserveForCheckout(@PathVariable UUID id) {
+        return vehicleService.reserveForCheckout(id, TenantContext.getTenantId());
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Delete a vehicle")

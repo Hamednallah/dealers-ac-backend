@@ -5,63 +5,104 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)
 ![Docker](https://img.shields.io/badge/Docker-Enabled-blue.svg)
 
-A robust, production-grade Multi-Tenant Dealer and Vehicle Inventory Management Backend. Designed as a **Modular Monolith** using Clean Architecture principles to enforce strict domain boundaries while offering horizontal scalability.
+A robust, production-grade Multi-Tenant Dealer and Vehicle Inventory Management Backend.
+Designed as a **Modular Monolith** using Clean Architecture principles that enforces strict domain boundaries while offering horizontal scalability.
+
+---
 
 ## 📚 Documentation
-Before diving into the code, please review the core design decisions:
-- [System Architecture](docs/architecture_design.md) - Multi-tenancy strategy, isolation, and security.
-- [Database Schema](docs/database_schema.md) - Entity relations and design considerations.
+
+Before diving into the code, review the core design decisions:
+
+- [System Architecture](docs/architecture_design.md) — Multi-tenancy strategy, concurrency control, and security.
+- [Database Schema](docs/database_schema.md) — Entity relations, ERD, and Flyway migration history.
+
+---
 
 ## ✨ Key Features
-* **Multi-Tenant Isolation:** Secure `tenant_id` column discriminators bound to a ThreadLocal context wrapper filtering requests via the `X-Tenant-Id` header.
-* **Stateless Security:** HS256 JWT Authentication with a local `jti` caching strategy for explicitly blacklisting revoked tokens.
-* **Resilience & Rate Limiting:** IP-based Bucket4j rate limiting out-of-the-box.
-* **Asynchronous Webhooks:** Spring Application Events decouple the standard request flow, allowing async Mailgun/Twilio dispatches for `VEHICLE_SOLD` triggers.
-* **Automated CI/CD:** Fully functional GitHub Actions pipeline pushing verified code directly into Docker deployments.
-* **Integration Testing:** Extensive `Testcontainers` lifecycle handling real PostgreSQL ephemeral databases.
+
+- **Multi-Tenant Isolation:** Secure `tenant_id` column discriminators bound to a `ThreadLocal` context wrapper filtering requests via the `X-Tenant-Id` header.
+- **Checkout Reservation Pattern:** `POST /vehicles/{id}/checkout` reserves a vehicle for **15 minutes** using JPA Optimistic Locking (`@Version`), atomically preventing two users from buying the same car simultaneously. Returns `409 Conflict` to the losing thread.
+- **Reservation Sweeper:** A `@Scheduled` background job runs every 60 seconds to automatically release expired reservations back to `AVAILABLE`.
+- **Stateless Security:** HS256 JWT Authentication with a `jti` blacklist strategy for explicitly revoking tokens.
+- **Resilience & Rate Limiting:** IP-based Bucket4j token-bucket rate limiting out-of-the-box.
+- **Asynchronous Event Bus:** Spring Application Events decouple the request flow, allowing async Mailgun/Twilio dispatches for `VEHICLE_SOLD` triggers.
+- **Automated CI/CD:** GitHub Actions pipeline running tests and pushing verified builds.
+- **Integration Testing:** Testcontainers lifecycle with real ephemeral PostgreSQL databases.
+
+---
 
 ## 🚀 Quick Start (Local Development)
 
 ### Prerequisites
+
 - Java 21+
 - Docker & Docker Compose
 - Maven 3.9+
 
 ### 1. Configure the Environment
-Copy the example environment securely:
+
 ```bash
 cp .env.example .env
 ```
-Update the `JWT_SECRET` inside `.env` with a secure base64 string.
+
+Update `JWT_SECRET` inside `.env` with a secure base64 string.
 
 ### 2. Boot the Database Layer
-Instead of installing PostgreSQL locally, leverage the internal container environment:
+
 ```bash
 docker-compose up -d db
 ```
-*Flyway migrations will automatically structure the schema on standard app startup.*
+
+Flyway migrations run automatically on startup and structure the schema.
 
 ### 3. Start the Application
+
 ```bash
 mvn spring-boot:run
 ```
-Once initialized, traverse to the interactive API Documentation here:  
-👉 **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
+
+API docs available at: 👉 **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**
+
+---
+
+## 🔄 Checkout API Flow
+
+```
+1. Client calls:  POST /vehicles/{id}/checkout
+                  → Status: RESERVED_PENDING_PAYMENT
+                  → reservation_expires_at = now + 15min
+
+2. Client calls:  PATCH /vehicles/{id}  { "status": "SOLD" }
+                  → Vehicle is sold, reservation cleared
+
+3. If no action:  VehicleReservationSweeper reverts → AVAILABLE after 15min
+```
 
 ---
 
 ## 🏗️ Testing Strategy
-Unit tests use Mockito for pure domain isolation, whilst Integration tests leverage **Testcontainers** to invoke Postgres containers validating end-to-end data lifecycle.
+
+- **Unit tests:** Mockito for pure domain isolation (`mvn test`).
+- **Integration tests:** Testcontainers with real PostgreSQL — requires Docker Desktop running.
 
 ```bash
-# Run all Unit and Integration Tests natively
+# Run all unit tests (no Docker needed)
+mvn test
+
+# Run everything including integration tests (requires Docker)
 mvn verify
 ```
 
+---
+
 ## 🔒 Access Controls & RBAC
-There are distinct role barriers enforced through Spring Security annotations:
-* `ROLE_USER`: Standard tenant users limited specifically to their `X-Tenant-Id` domains.
-* `ROLE_GLOBAL_ADMIN`: Superusers capable of pinging multi-tenant aggregating statistics (e.g. `/admin/dealers/countBySubscription`).
+
+| Role | Access |
+|------|--------|
+| `TENANT_USER` | CRUD on dealers/vehicles scoped to their own `X-Tenant-Id` |
+| `GLOBAL_ADMIN` | Cross-tenant aggregation: `GET /admin/dealers/countBySubscription` |
 
 ---
+
 *Authored for the Dealers AC Technical Assessment.*

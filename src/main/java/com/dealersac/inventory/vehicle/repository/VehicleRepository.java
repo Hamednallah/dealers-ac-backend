@@ -18,4 +18,6 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID>,
     List<Vehicle> findAllByDealerIdAndTenantId(UUID dealerId, String tenantId);
 
     boolean existsByDealerIdAndTenantId(UUID dealerId, String tenantId);
+
+    List<Vehicle> findByStatusAndReservationExpiresAtBefore(com.dealersac.inventory.vehicle.domain.VehicleStatus status, java.time.Instant expiry);
 }

@@ -12,6 +12,7 @@ import java.util.UUID;
 public interface VehicleService {
     VehicleResponse create(VehicleRequest request, String tenantId);
     VehicleResponse findById(UUID id, String tenantId);
+    VehicleResponse reserveForCheckout(UUID id, String tenantId);
     Page<VehicleResponse> findAll(VehicleFilter filter, Pageable pageable);
     VehicleResponse update(UUID id, VehiclePatchRequest patch, String tenantId);
     void delete(UUID id, String tenantId);

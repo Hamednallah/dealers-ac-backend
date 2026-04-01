@@ -75,6 +75,26 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     @Override
+    @Transactional
+    @Audited(action = "RESERVE_VEHICLE", entityType = "Vehicle")
+    @PreAuthorize("hasRole('TENANT_USER')")
+    public VehicleResponse reserveForCheckout(java.util.UUID id, String tenantId) {
+        Vehicle vehicle = vehicleRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle", id));
+
+        if (vehicle.getStatus() != VehicleStatus.AVAILABLE) {
+            throw new IllegalArgumentException("Vehicle is not available for reservation. Current status: " + vehicle.getStatus());
+        }
+
+        vehicle.setStatus(VehicleStatus.RESERVED_PENDING_PAYMENT);
+        vehicle.setReservationExpiresAt(java.time.Instant.now().plus(15, java.time.temporal.ChronoUnit.MINUTES));
+        
+        vehicle = vehicleRepository.save(vehicle);
+        log.info("Vehicle {} reserved for checkout until {}", vehicle.getId(), vehicle.getReservationExpiresAt());
+        return VehicleResponse.from(vehicle);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     @PreAuthorize("hasRole('TENANT_USER') or hasRole('GLOBAL_ADMIN')")
     public Page<VehicleResponse> findAll(VehicleFilter filter, Pageable pageable) {
@@ -91,16 +111,27 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle vehicle = vehicleRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle", id));
 
-        boolean wasAvailable = vehicle.getStatus() == VehicleStatus.AVAILABLE;
+        boolean wasAvailableOrReserved = vehicle.getStatus() == VehicleStatus.AVAILABLE 
+                                      || vehicle.getStatus() == VehicleStatus.RESERVED_PENDING_PAYMENT;
+
+        // If trying to buy it directly, or complete a reservation
+        if (patch.getStatus() == VehicleStatus.SOLD && !wasAvailableOrReserved) {
+            throw new IllegalArgumentException("Vehicle cannot be sold from current status: " + vehicle.getStatus());
+        }
 
         if (patch.getModel()  != null) vehicle.setModel(patch.getModel());
         if (patch.getPrice()  != null) vehicle.setPrice(patch.getPrice());
         if (patch.getStatus() != null) vehicle.setStatus(patch.getStatus());
 
+        // Clear reservation if it gets sold
+        if (vehicle.getStatus() == VehicleStatus.SOLD) {
+            vehicle.setReservationExpiresAt(null);
+        }
+
         vehicle = vehicleRepository.save(vehicle);
 
         // Fire VEHICLE_SOLD event when status transitions to SOLD
-        if (wasAvailable && vehicle.getStatus() == VehicleStatus.SOLD) {
+        if (wasAvailableOrReserved && vehicle.getStatus() == VehicleStatus.SOLD) {
             eventPublisher.publishEvent(new DomainEvent(this, "VEHICLE_SOLD", tenantId,
                     Map.of(
                         "vehicleId", vehicle.getId().toString(),

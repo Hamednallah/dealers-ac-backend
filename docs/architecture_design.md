@@ -1,20 +1,99 @@
 # System Architecture Design
 
 ## 1. Overview
-The Dealers Auto Center (AC) system is designed as a modular monolith. This approach provides the simplicity of a single deployment unit while enforcing strict boundaries between domains (Auth, Dealer, Vehicle, Admin) to ensure the system is ready to be split into microservices in the future if scale demands.
+
+The Dealers Auto Center (AC) system is designed as a **modular monolith**. This approach provides the simplicity of a single deployment unit while enforcing strict domain boundaries (Auth, Dealer, Vehicle, Admin) to ensure the system is ready to be split into microservices if scale demands.
+
+---
 
 ## 2. Multi-Tenancy Strategy
-To securely isolate data between different client networks, we chose a **Discriminator Column** (Single Database, Single Schema) multi-tenant architecture. 
+
+To securely isolate data between different client networks, we chose a **Discriminator Column** (Single Database, Single Schema) multi-tenant architecture.
+
 - **Header Propagation:** `X-Tenant-Id` is required on all protected routes.
-- **Tenant Context:** A `ThreadLocal` context filter securely captures the tenant per request.
-- **Data Isolation:** All entities implement IDOR protection. Every query explicitly checks `tenant_id` alongside the primary key to ensure data leakage is mathematically impossible.
+- **Tenant Context:** A `ThreadLocal` context filter captures the tenant per request and clears it after the response.
+- **Data Isolation:** All entities implement IDOR protection. Every query explicitly checks `tenant_id` alongside the primary key ensuring data leakage is mathematically impossible.
+
+---
 
 ## 3. Security
-- **Stateless Authentication:** JSON Web Tokens (JWT) signed with HS256 algorithm.
-- **Rate Limiting:** IP-based bucket rate limiting using Bucket4j to prevent brute-force attacks.
-- **Role-Based Access Control (RBAC):** Global Admins vs Tenant standard users explicitly mapped to endpoint authorities.
+
+- **Stateless Authentication:** JSON Web Tokens (JWT) signed with HS256.
+- **Rate Limiting:** IP-based token-bucket rate limiting via Bucket4j to prevent brute-force attacks.
+- **Role-Based Access Control (RBAC):** `GLOBAL_ADMIN` vs `TENANT_USER` roles explicitly mapped to endpoint authorities via `@PreAuthorize`.
+- **Cross-Tenant Access:** Returns `403 Forbidden` to avoid leaking resource existence.
+
+---
 
 ## 4. Asynchronous Integrations
-Instead of synchronous blocking calls, the system leverages Spring Cloud/Application Events to decouple domain logic.
-- When a Vehicle status changes to `SOLD`, an event is emitted.
-- Listeners catch this event to asynchronously trigger Mailgun emails, Webhooks, or Twilio notifications, ensuring the main thread responds to the user instantly.
+
+Instead of synchronous blocking calls, the system uses Spring Application Events to decouple domain logic.
+
+- When a `Vehicle` transitions to `SOLD`, a `DomainEvent` is emitted.
+- Async listeners trigger: **Mailgun** emails, **Webhooks**, **Twilio** SMS notifications — without blocking the main request thread.
+
+---
+
+## 5. Checkout Reservation Pattern (Concurrency Control)
+
+### The Problem
+
+Multiple users can attempt to purchase the same vehicle simultaneously. Without locks, two users could both read `AVAILABLE`, commit their purchase transactions, and both believe they succeeded. This is a **race condition** (lost update problem).
+
+### The Solution: Optimistic Locking + Timed Reservation
+
+```
+User A ──┐
+          ├── POST /vehicles/{id}/checkout  ──► status=RESERVED_PENDING_PAYMENT
+User B ──┘                                       reservation_expires_at = now + 15min
+          │
+          └── Both hit at same time?
+               @Version column detects concurrent write
+               ──► ObjectOptimisticLockingFailureException
+               ──► 409 Conflict returned to losing thread
+```
+
+#### Mermaid Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant UserA
+    participant UserB
+    participant API
+    participant DB
+
+    UserA->>API: POST /vehicles/{id}/checkout
+    UserB->>API: POST /vehicles/{id}/checkout
+
+    API->>DB: SELECT * FROM vehicles WHERE id=? (version=0)
+    API->>DB: SELECT * FROM vehicles WHERE id=? (version=0)
+
+    API->>DB: UPDATE vehicles SET status='RESERVED', version=1 WHERE id=? AND version=0
+    Note over DB: UserA wins — version bumped to 1
+
+    API->>DB: UPDATE vehicles SET status='RESERVED', version=1 WHERE id=? AND version=0
+    Note over DB: 0 rows affected — version already = 1!
+    DB-->>API: ObjectOptimisticLockingFailureException
+
+    API-->>UserA: 200 OK (reserved for 15 min)
+    API-->>UserB: 409 Conflict — "vehicle was just reserved"
+```
+
+### Reservation Expiry (The Sweeper)
+
+If a user reserves a vehicle but never completes the purchase, `VehicleReservationSweeper` runs every 60 seconds and resets any `RESERVED_PENDING_PAYMENT` with `reservation_expires_at < NOW()` back to `AVAILABLE`. This guarantees no vehicle is permanently stuck.
+
+```mermaid
+flowchart LR
+    A[Vehicle: AVAILABLE] -->|POST checkout| B[RESERVED_PENDING_PAYMENT]
+    B -->|PATCH status=SOLD| C[SOLD]
+    B -->|15 min timeout — Sweeper| A
+```
+
+---
+
+## 6. Background Scheduling
+
+- **Mechanism:** `@EnableScheduling` + `@Scheduled(fixedRate = 60000)` on `VehicleReservationSweeper`.
+- **Thread Pool:** Runs on Spring's default single-threaded scheduler. For high-load production, configure a `ThreadPoolTaskScheduler` bean.
+- **Observability:** All invocations are logged; metrics exposed via Spring Actuator.
