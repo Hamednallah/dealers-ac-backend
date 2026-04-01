@@ -99,13 +99,13 @@ class TenantIsolationIT {
     }
 
     @Test @Order(4)
-    @DisplayName("Cross-tenant access → 404 (resource existence not revealed)")
-    void crossTenantAccess_returns404() throws Exception {
+    @DisplayName("Cross-tenant access → 403")
+    void crossTenantAccess_returns403() throws Exception {
         // Tenant B tries to access Tenant A's dealer
         mockMvc.perform(get("/dealers/" + dealerIdInTenantA)
                         .header("Authorization", "Bearer " + tokenTenantB)
                         .header("X-Tenant-Id", "tenant-beta"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
     }
 
     @Test @Order(5)

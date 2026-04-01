@@ -1,6 +1,6 @@
 package com.dealersac.inventory.auth.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.Data;
@@ -16,7 +16,6 @@ public class RegisterRequest {
 
     @NotBlank(message = "Password is required")
     @Size(min = 8, message = "Password must be at least 8 characters")
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Schema(example = "SecurePass@123", accessMode = Schema.AccessMode.WRITE_ONLY)
     private String password;
 

@@ -54,9 +54,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(CrossTenantAccessException.class)
     public ProblemDetail handleCrossTenant(CrossTenantAccessException ex) {
         log.warn("Cross-tenant access attempt blocked");
-        // Return 404 to avoid confirming resource existence to another tenant
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Resource not found");
-        pd.setType(URI.create("/errors/not-found"));
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "Access to this resource is forbidden");
+        pd.setType(URI.create("/errors/forbidden"));
         return pd;
     }
 
