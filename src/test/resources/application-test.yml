@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    # Overridden by Testcontainers @ServiceConnection at runtime
+    url: jdbc:postgresql://localhost:5432/test
+    username: test
+    password: test
+  jpa:
+    show-sql: false
+  flyway:
+    enabled: true
+
+app:
+  jwt:
+    secret: test-secret-key-must-be-at-least-256-bits-long-for-hs256
+    expiration-ms: 900000
+  admin:
+    password: Admin@1234!
+  mailgun:
+    enabled: false
+  webhook:
+    enabled: false
+  rate-limit:
+    auth-requests-per-minute: 100   # relaxed for tests
+    register-requests-per-minute: 100
+    api-requests-per-minute: 1000
