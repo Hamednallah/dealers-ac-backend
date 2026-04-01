@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────
 # Stage 1: Build
 # ─────────────────────────────────────────────────────────
-FROM maven:3.9-eclipse-temurin-17 AS builder
+FROM maven:3.9-eclipse-temurin-21 AS builder
 
 WORKDIR /build
 
@@ -15,7 +15,7 @@ RUN mvn clean package -DskipTests -q
 # ─────────────────────────────────────────────────────────
 # Stage 2: Runtime (minimal Linux image)
 # ─────────────────────────────────────────────────────────
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 
 LABEL maintainer="Ahmed Abdulafiz"
 LABEL description="Dealers AC Backend — Inventory Module"
