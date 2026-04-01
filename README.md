@@ -61,7 +61,7 @@ mvn verify
 ## 🔒 Access Controls & RBAC
 There are distinct role barriers enforced through Spring Security annotations:
 * `ROLE_USER`: Standard tenant users limited specifically to their `X-Tenant-Id` domains.
-* `ROLE_GLOBAL_ADMIN`: Superusers capable of pinging multi-tenant aggregating statistics (e.g. `/api/v1/admin/stats`).
+* `ROLE_GLOBAL_ADMIN`: Superusers capable of pinging multi-tenant aggregating statistics (e.g. `/admin/dealers/countBySubscription`).
 
 ---
 *Authored for the Dealers AC Technical Assessment.*
