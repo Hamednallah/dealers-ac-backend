@@ -34,6 +34,16 @@ Instead of synchronous blocking calls, the system uses Spring Application Events
 
 ---
 
+## 5. Audit Strategy (Hybrid Persistence)
+
+To ensure the system remains performant as audit volume grows, we moved auditing to a **NoSQL (MongoDB)** backend.
+
+- **Append-Only:** Audit logs are write-heavy and don't require relational joins.
+- **Async Auditing:** Leveraging Spring AOP (`@Audited`), the audit capture happens asynchronously, ensuring 0ms impact on the primary business transaction.
+- **Retention:** Combined with structured logging and 31-day log rotation, the system provides full observability for compliance and debugging.
+
+---
+
 ## 5. Checkout Reservation Pattern (Concurrency Control)
 
 ### The Problem
@@ -97,3 +107,14 @@ flowchart LR
 - **Mechanism:** `@EnableScheduling` + `@Scheduled(fixedRate = 60000)` on `VehicleReservationSweeper`.
 - **Thread Pool:** Runs on Spring's default single-threaded scheduler. For high-load production, configure a `ThreadPoolTaskScheduler` bean.
 - **Observability:** All invocations are logged; metrics exposed via Spring Actuator.
+
+---
+
+## 8. Testing Infrastructure
+
+A unified testing base ensures stability across the entire suite.
+
+- **BaseIntegrationTest:** A single parent class for all `*IT.java` files.
+- **Shared Containers:** Uses a singleton container pattern for PostgreSQL and MongoDB, starting them once per suite run.
+- **Stability:** Solves common Testcontainers issues like port exhaustion or JVM thread leakage.
+- **Coverage:** Integrated JaCoCo in `pom.xml` aggregates coverage from both unit and integration tests, ensuring >80% threshold across core modules.

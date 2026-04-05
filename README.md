@@ -3,6 +3,7 @@
 ![Java 21](https://img.shields.io/badge/Java-21-orange.svg)
 ![Spring Boot 3](https://img.shields.io/badge/Spring%20Boot-3.2.4-brightgreen.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)
+![MongoDB](https://img.shields.io/badge/MongoDB-6.0-green.svg)
 ![Docker](https://img.shields.io/badge/Docker-Enabled-blue.svg)
 
 A robust, production-grade Multi-Tenant Dealer and Vehicle Inventory Management Backend.
@@ -26,6 +27,7 @@ Before diving into the code, review the core design decisions:
 - **Reservation Sweeper:** A `@Scheduled` background job runs every 60 seconds to automatically release expired reservations back to `AVAILABLE`.
 - **Stateless Security:** HS256 JWT Authentication with a `jti` blacklist strategy for explicitly revoking tokens.
 - **Resilience & Rate Limiting:** IP-based Bucket4j token-bucket rate limiting out-of-the-box.
+- **NoSQL Audit Trail:** High-performance, append-only auditing stored in **MongoDB** via AOP, decoupling observability from transactional load.
 - **Asynchronous Event Bus:** Spring Application Events decouple the request flow, allowing async Mailgun/Twilio dispatches for `VEHICLE_SOLD` triggers.
 - **Automated CI/CD:** GitHub Actions pipeline running tests and pushing verified builds.
 - **Integration Testing:** Testcontainers lifecycle with real ephemeral PostgreSQL databases.
@@ -51,7 +53,7 @@ Update `JWT_SECRET` inside `.env` with a secure base64 string.
 ### 2. Boot the Database Layer
 
 ```bash
-docker-compose up -d db
+docker-compose up -d db mongodb
 ```
 
 Flyway migrations run automatically on startup and structure the schema.
@@ -84,7 +86,8 @@ API docs available at: 👉 **[http://localhost:8080/swagger-ui.html](http://loc
 ## 🏗️ Testing Strategy
 
 - **Unit tests:** Mockito for pure domain isolation (`mvn test`).
-- **Integration tests:** Testcontainers with real PostgreSQL — requires Docker Desktop running.
+- **Integration tests:** Unified [BaseIntegrationTest](src/test/java/com/dealersac/inventory/BaseIntegrationTest.java) context using Testcontainers with PostgreSQL and MongoDB.
+- **Coverage:** **>80% combined coverage** across core business modules.
 
 ```bash
 # Run all unit tests (no Docker needed)

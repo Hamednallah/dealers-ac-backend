@@ -2,7 +2,9 @@
 
 ## Tenancy Approach
 
-The system uses **Discriminator Columns** for multi-tenancy across a single PostgreSQL instance. All entities bind `tenant_id` to the authenticated request header value.
+The system uses a **Hybrid Persistence** approach:
+- **PostgreSQL:** Stores transactional business data (Users, Dealers, Vehicles) using **Discriminator Columns** for multi-tenancy.
+- **MongoDB:** Stores high-volume, append-only observability data (Audit Logs) to decouple them from the primary transactional load.
 
 ---
 
@@ -39,13 +41,18 @@ The system uses **Discriminator Columns** for multi-tenancy across a single Post
 - **`reservation_expires_at` (TIMESTAMPTZ):** Expiry timestamp for the 15-minute checkout reservation window.
 - **Indexes:** Multi-column B-tree index on `(dealer_id, status)` for fast dashboard filtering.
 
-### `audit_logs`
-- Append-only event log tracking modifications across any entity via AOP (`@Audited`).
-- Fields: `action`, `entity_type`, `entity_id`, `tenant_id`, `performed_by`, `created_at`.
-
 ### `jwt_blacklist`
 - Stateless JWT tokens can't be mathematically revoked mid-flight.
 - This table stores explicitly logged-out `jti` claims until their natural expiry.
+
+---
+
+## NoSQL Collections (MongoDB)
+
+### `audit_logs`
+- Append-only event log tracking modifications across any entity via AOP (`@Audited`).
+- Stored as JSON documents to allow for flexible payload structures without schema migrations.
+- **Fields:** `action`, `entityType`, `entityId`, `tenantId`, `performedBy`, `createdAt`, `metadata`.
 
 ---
 
@@ -81,20 +88,18 @@ erDiagram
         TIMESTAMPTZ reservation_expires_at
     }
 
-    audit_logs {
-        UUID id PK
-        STRING action
-        STRING entity_type
-        UUID entity_id
-        STRING tenant_id
-        STRING performed_by
-        TIMESTAMPTZ created_at
-    }
-
     jwt_blacklist {
         UUID id PK
         STRING jti
         TIMESTAMPTZ expires_at
+    }
+
+    audit_logs_nosql {
+        Document _id
+        String action
+        String entityType
+        String tenantId
+        Date createdAt
     }
 
     dealers ||--o{ vehicles : "has many"
