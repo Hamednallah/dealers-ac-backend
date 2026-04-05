@@ -1,5 +1,6 @@
 package com.dealersac.inventory.integration;
 
+import com.dealersac.inventory.BaseIntegrationTest;
 import com.dealersac.inventory.dealer.domain.Dealer;
 import com.dealersac.inventory.dealer.domain.SubscriptionType;
 import com.dealersac.inventory.dealer.repository.DealerRepository;
@@ -9,16 +10,10 @@ import com.dealersac.inventory.vehicle.domain.VehicleStatus;
 import com.dealersac.inventory.vehicle.repository.VehicleRepository;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -45,19 +40,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * New threads spawned by ExecutorService don't inherit the parent
  * SecurityContext. Each thread must set its own SecurityContext.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-@ActiveProfiles("test")
 @DisplayName("Integration Tests — Vehicle Checkout Concurrency")
-class VehicleConcurrencyIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:15-alpine")
-                    .withDatabaseName("dealersac_test_concurrency")
-                    .withUsername("test")
-                    .withPassword("test");
+class VehicleConcurrencyIT extends BaseIntegrationTest {
 
     @Autowired private VehicleService vehicleService;
     @Autowired private VehicleRepository vehicleRepository;

@@ -1,13 +1,14 @@
 package com.dealersac.inventory.common.audit;
 
-import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Entity
-@Table(name = "audit_logs")
+@Document(collection = "audit_logs")
 @Getter
 @Builder
 @NoArgsConstructor
@@ -15,32 +16,25 @@ import java.util.UUID;
 public class AuditLog {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    private String id;
 
-    @Column(nullable = false)
     private String actor;
 
-    @Column(name = "tenant_id")
+    @Field("tenant_id")
     private String tenantId;
 
-    @Column(nullable = false)
     private String action;
 
-    @Column(name = "entity_type")
+    @Field("entity_type")
     private String entityType;
 
-    @Column(name = "entity_id")
+    @Field("entity_id")
     private UUID entityId;
 
-    @Column(name = "ip_address")
+    @Field("ip_address")
     private String ipAddress;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) createdAt = LocalDateTime.now();
-    }
+    @Field("created_at")
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

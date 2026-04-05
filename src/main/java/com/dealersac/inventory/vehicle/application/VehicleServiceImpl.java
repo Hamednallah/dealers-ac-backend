@@ -2,7 +2,6 @@ package com.dealersac.inventory.vehicle.application;
 
 import com.dealersac.inventory.common.audit.Audited;
 import com.dealersac.inventory.common.exception.CrossTenantAccessException;
-import com.dealersac.inventory.common.exception.IllegalArgumentException;
 import com.dealersac.inventory.common.exception.ResourceNotFoundException;
 import com.dealersac.inventory.common.webhook.DomainEvent;
 import com.dealersac.inventory.dealer.domain.Dealer;
@@ -29,8 +28,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VehicleServiceImpl implements VehicleService {
 
-    private final VehicleRepository      vehicleRepository;
-    private final DealerRepository       dealerRepository;
+    private final VehicleRepository vehicleRepository;
+    private final DealerRepository dealerRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
@@ -43,8 +42,7 @@ public class VehicleServiceImpl implements VehicleService {
                 .orElseThrow(() -> new ResourceNotFoundException("Dealer", request.getDealerId()));
 
         if (!dealer.getTenantId().equals(tenantId)) {
-            throw new IllegalArgumentException(
-                    "Dealer does not belong to your tenant");
+            throw new CrossTenantAccessException();
         }
 
         Vehicle vehicle = Vehicle.builder()
@@ -83,12 +81,13 @@ public class VehicleServiceImpl implements VehicleService {
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle", id));
 
         if (vehicle.getStatus() != VehicleStatus.AVAILABLE) {
-            throw new IllegalArgumentException("Vehicle is not available for reservation. Current status: " + vehicle.getStatus());
+            throw new IllegalStateException(
+                    "Vehicle is not available for reservation. Current status: " + vehicle.getStatus());
         }
 
         vehicle.setStatus(VehicleStatus.RESERVED_PENDING_PAYMENT);
         vehicle.setReservationExpiresAt(java.time.Instant.now().plus(15, java.time.temporal.ChronoUnit.MINUTES));
-        
+
         vehicle = vehicleRepository.save(vehicle);
         log.info("Vehicle {} reserved for checkout until {}", vehicle.getId(), vehicle.getReservationExpiresAt());
         return VehicleResponse.from(vehicle);
@@ -111,17 +110,20 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle vehicle = vehicleRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle", id));
 
-        boolean wasAvailableOrReserved = vehicle.getStatus() == VehicleStatus.AVAILABLE 
-                                      || vehicle.getStatus() == VehicleStatus.RESERVED_PENDING_PAYMENT;
+        boolean wasAvailableOrReserved = vehicle.getStatus() == VehicleStatus.AVAILABLE
+                || vehicle.getStatus() == VehicleStatus.RESERVED_PENDING_PAYMENT;
 
         // If trying to buy it directly, or complete a reservation
         if (patch.getStatus() == VehicleStatus.SOLD && !wasAvailableOrReserved) {
-            throw new IllegalArgumentException("Vehicle cannot be sold from current status: " + vehicle.getStatus());
+            throw new IllegalStateException("Vehicle cannot be sold from current status: " + vehicle.getStatus());
         }
 
-        if (patch.getModel()  != null) vehicle.setModel(patch.getModel());
-        if (patch.getPrice()  != null) vehicle.setPrice(patch.getPrice());
-        if (patch.getStatus() != null) vehicle.setStatus(patch.getStatus());
+        if (patch.getModel() != null)
+            vehicle.setModel(patch.getModel());
+        if (patch.getPrice() != null)
+            vehicle.setPrice(patch.getPrice());
+        if (patch.getStatus() != null)
+            vehicle.setStatus(patch.getStatus());
 
         // Clear reservation if it gets sold
         if (vehicle.getStatus() == VehicleStatus.SOLD) {
@@ -134,11 +136,10 @@ public class VehicleServiceImpl implements VehicleService {
         if (wasAvailableOrReserved && vehicle.getStatus() == VehicleStatus.SOLD) {
             eventPublisher.publishEvent(new DomainEvent(this, "VEHICLE_SOLD", tenantId,
                     Map.of(
-                        "vehicleId", vehicle.getId().toString(),
-                        "model",     vehicle.getModel(),
-                        "price",     vehicle.getPrice().toString(),
-                        "dealerId",  vehicle.getDealerId().toString()
-                    )));
+                            "vehicleId", vehicle.getId().toString(),
+                            "model", vehicle.getModel(),
+                            "price", vehicle.getPrice().toString(),
+                            "dealerId", vehicle.getDealerId().toString())));
             log.info("Vehicle sold event fired: {}", vehicle.getId());
         }
 

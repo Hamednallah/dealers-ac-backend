@@ -1,5 +1,6 @@
 package com.dealersac.inventory.integration;
 
+import com.dealersac.inventory.BaseIntegrationTest;
 import com.dealersac.inventory.auth.dto.LoginRequest;
 import com.dealersac.inventory.auth.dto.RegisterRequest;
 import com.dealersac.inventory.dealer.dto.DealerRequest;
@@ -7,16 +8,9 @@ import com.dealersac.inventory.dealer.domain.SubscriptionType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -31,21 +25,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * - subscription=PREMIUM filter stays tenant-scoped
  * - Admin endpoint requires GLOBAL_ADMIN
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureMockMvc
-@Testcontainers
-@ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("Integration Tests — Tenant Isolation & Security")
-class TenantIsolationIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>("postgres:15-alpine")
-                    .withDatabaseName("dealersac_test")
-                    .withUsername("test")
-                    .withPassword("test");
+class TenantIsolationIT extends BaseIntegrationTest {
 
     @Autowired MockMvc      mockMvc;
     @Autowired ObjectMapper objectMapper;

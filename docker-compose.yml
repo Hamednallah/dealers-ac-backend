@@ -56,8 +56,21 @@ services:
     networks:
       - dealersac-net
 
+  mongodb:
+    image: mongo:latest
+    container_name: dealers-ac-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=audit_db
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - dealersac-net
+
 volumes:
   postgres_data:
+  mongodb_data:
 
 networks:
   dealersac-net:

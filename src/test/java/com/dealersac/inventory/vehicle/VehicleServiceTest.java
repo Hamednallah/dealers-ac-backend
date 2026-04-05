@@ -31,11 +31,15 @@ import static org.mockito.Mockito.*;
 @DisplayName("VehicleService Unit Tests")
 class VehicleServiceTest {
 
-    @Mock VehicleRepository       vehicleRepository;
-    @Mock DealerRepository        dealerRepository;
-    @Mock ApplicationEventPublisher eventPublisher;
+    @Mock
+    VehicleRepository vehicleRepository;
+    @Mock
+    DealerRepository dealerRepository;
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks VehicleServiceImpl vehicleService;
+    @InjectMocks
+    VehicleServiceImpl vehicleService;
 
     private static final String TENANT_A = "tenant-alpha";
     private static final String TENANT_B = "tenant-beta";
@@ -96,8 +100,7 @@ class VehicleServiceTest {
 
             // Caller is Tenant A — dealer belongs to Tenant B
             assertThatThrownBy(() -> vehicleService.create(req, TENANT_A))
-                    .isInstanceOf(com.dealersac.inventory.common.exception.IllegalArgumentException.class)
-                    .hasMessageContaining("tenant");
+                    .isInstanceOf(CrossTenantAccessException.class);
         }
     }
 
@@ -160,6 +163,68 @@ class VehicleServiceTest {
             vehicleService.update(v.getId(), patch, TENANT_A);
 
             verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("throws ResourceNotFoundException if vehicle not found")
+        void update_notFound_throws() {
+            UUID id = UUID.randomUUID();
+            when(vehicleRepository.findByIdAndTenantId(id, TENANT_A)).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> vehicleService.update(id, new VehiclePatchRequest(), TENANT_A))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("reserveForCheckout()")
+    class CheckoutTests {
+        @Test
+        @DisplayName("successfully reserves AVAILABLE vehicle")
+        void reserve_success() {
+            Vehicle v = vehicle(TENANT_A, UUID.randomUUID());
+            when(vehicleRepository.findByIdAndTenantId(v.getId(), TENANT_A)).thenReturn(Optional.of(v));
+            when(vehicleRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            vehicleService.reserveForCheckout(v.getId(), TENANT_A);
+
+            assertThat(v.getStatus()).isEqualTo(VehicleStatus.RESERVED_PENDING_PAYMENT);
+            assertThat(v.getReservationExpiresAt()).isAfter(java.time.Instant.now());
+            verify(vehicleRepository).save(v);
+        }
+
+        @Test
+        @DisplayName("throws IllegalStateException if vehicle NOT AVAILABLE")
+        void reserve_notAvailable_throws() {
+            Vehicle v = vehicle(TENANT_A, UUID.randomUUID());
+            v.setStatus(VehicleStatus.SOLD);
+            when(vehicleRepository.findByIdAndTenantId(v.getId(), TENANT_A)).thenReturn(Optional.of(v));
+
+            assertThatThrownBy(() -> vehicleService.reserveForCheckout(v.getId(), TENANT_A))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("delete()")
+    class DeleteTests {
+        @Test
+        @DisplayName("successfully deletes own vehicle")
+        void delete_success() {
+            Vehicle v = vehicle(TENANT_A, UUID.randomUUID());
+            when(vehicleRepository.findByIdAndTenantId(v.getId(), TENANT_A)).thenReturn(Optional.of(v));
+
+            vehicleService.delete(v.getId(), TENANT_A);
+
+            verify(vehicleRepository).delete(v);
+        }
+
+        @Test
+        @DisplayName("throws ResourceNotFoundException if delete target not found")
+        void delete_notFound_throws() {
+            UUID id = UUID.randomUUID();
+            when(vehicleRepository.findByIdAndTenantId(id, TENANT_A)).thenReturn(Optional.empty());
+            assertThatThrownBy(() -> vehicleService.delete(id, TENANT_A))
+                    .isInstanceOf(ResourceNotFoundException.class);
         }
     }
 }

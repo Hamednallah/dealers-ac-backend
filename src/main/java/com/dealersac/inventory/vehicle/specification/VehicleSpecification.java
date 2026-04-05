@@ -10,6 +10,7 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Composable JPA Specifications for dynamic vehicle filtering.
@@ -51,7 +52,7 @@ public class VehicleSpecification {
             // Joins dealers table and filters by subscriptionType.
             // Still tenant-scoped (vehicle.tenantId already added above).
             if (filter.getSubscription() == SubscriptionType.PREMIUM) {
-                Subquery<Long> subquery = query.subquery(Long.class);
+                Subquery<UUID> subquery = query.subquery(UUID.class);
                 Root<Dealer> dealerRoot = subquery.from(Dealer.class);
                 subquery.select(dealerRoot.get("id"))
                         .where(
