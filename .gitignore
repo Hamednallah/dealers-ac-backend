@@ -16,6 +16,7 @@ application-local.yml
 *.iml
 .vscode/
 *.DS_Store
+PRESENTATION.md
 
 # ─── Logs ────────────────────────────────────────────────
 *.log

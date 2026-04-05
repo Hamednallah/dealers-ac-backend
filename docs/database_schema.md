@@ -16,6 +16,7 @@ The system uses **Discriminator Columns** for multi-tenancy across a single Post
 | `V4__create_audit_and_blacklist.sql` | Audit logs + JWT blacklist |
 | `V5__create_jwt_blacklist.sql` | JWT blacklist table for token revocation |
 | `V6__add_vehicle_reservation_and_locking.sql` | `@Version` column + `reservation_expires_at` for checkout concurrency |
+| `V7__increase_vehicle_status_length.sql` | Increas the vehicle status length and updates it check to accommodate new status|
 
 ---
 
